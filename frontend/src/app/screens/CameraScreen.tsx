@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useState, useCallback} from 'react';
 import {StyleSheet, Text, View, Alert, Linking} from 'react-native';
 import {
   Camera,
@@ -7,21 +7,29 @@ import {
   useFrameProcessor,
 } from 'react-native-vision-camera';
 import {useTensorflowModel} from 'react-native-fast-tflite';
-import {useResizePlugin} from 'react-native-vision-camera';
+import {useRunOnJS} from 'react-native-worklets-core';
+
+type BBox = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  confidence: number;
+};
+
+const YUNET_INPUT = 640;
+const CONFIDENCE_THRESHOLD = 0.7;
 
 export default function CameraScreen() {
   const {hasPermission, requestPermission} = useCameraPermission();
   const device = useCameraDevice('front');
-  const [faceDetected, setFaceDetected] = useState(false);
+  const [bbox, setBBox] = useState<BBox | null>(null);
+  const [fps, setFps] = useState(0);
 
-  // Load YuNet TFLite model
   const yunet = useTensorflowModel(
     require('../../../assets/models/yunet_int8.tflite'),
   );
   const model = yunet.state === 'loaded' ? yunet.model : undefined;
-
-  // Resize plugin for frame preprocessing
-  const {resize} = useResizePlugin();
 
   useEffect(() => {
     if (!hasPermission) {
@@ -29,7 +37,7 @@ export default function CameraScreen() {
         if (!granted) {
           Alert.alert(
             'Camera Permission Required',
-            'Please enable camera access in Settings to use face authentication.',
+            'Please enable camera access in Settings.',
             [
               {text: 'Open Settings', onPress: () => Linking.openSettings()},
               {text: 'Cancel', style: 'cancel'},
@@ -40,40 +48,67 @@ export default function CameraScreen() {
     }
   }, [hasPermission, requestPermission]);
 
+  const onDetection = useCallback((detection: BBox | null, latency: number) => {
+    setBBox(detection);
+    if (latency > 0) setFps(Math.round(1000 / latency));
+  }, []);
+
+  const onDetectionJS = useRunOnJS(onDetection, [onDetection]);
+
   const frameProcessor = useFrameProcessor(
     frame => {
       'worklet';
       if (!model) return;
 
-      // Resize frame to YuNet expected input: 640x640 RGB
-      const resized = resize(frame, {
-        scale: {width: 640, height: 640},
-        pixelFormat: 'rgb',
-        dataType: 'float32',
-      });
+      const start = performance.now();
 
-      // Run YuNet inference
-      const outputs = model.runSync([resized]);
+      try {
+        const outputs = model.runSync([frame]);
 
-      // YuNet outputs 12 tensors: cls/obj/bbox/kps at 3 scales (8/16/32)
-      // cls_8 shape: [1, 6400, 1] — confidence scores at stride 8
-      if (outputs && outputs.length > 0) {
-        const cls8 = outputs[0]; // confidence scores at finest scale
-        // Check if any detection has confidence > 0.7
-        let detected = false;
-        if (cls8 && cls8.length > 0) {
-          for (let i = 0; i < Math.min(cls8.length, 6400); i++) {
-            if ((cls8 as Float32Array)[i] > 0.7) {
-              detected = true;
-              break;
+        if (outputs && outputs.length >= 4) {
+          // YuNet outputs: cls scores at stride 8 (finest scale)
+          const cls8 = outputs[0] as unknown as Float32Array;
+          const numAnchors = cls8.length;
+
+          let bestScore = 0;
+          let bestIdx = -1;
+          for (let i = 0; i < numAnchors; i++) {
+            if (cls8[i] > bestScore) {
+              bestScore = cls8[i];
+              bestIdx = i;
             }
           }
+
+          const latency = performance.now() - start;
+
+          if (bestScore > CONFIDENCE_THRESHOLD && bestIdx >= 0) {
+            // Approximate bbox from grid position
+            const gridW = YUNET_INPUT / 8;
+            const gridX = bestIdx % gridW;
+            const gridY = Math.floor(bestIdx / gridW);
+
+            const scaleX = frame.width / YUNET_INPUT;
+            const scaleY = frame.height / YUNET_INPUT;
+
+            onDetectionJS(
+              {
+                x: (gridX * 8 - 40) * scaleX,
+                y: (gridY * 8 - 40) * scaleY,
+                width: 80 * scaleX,
+                height: 100 * scaleY,
+                confidence: bestScore,
+              },
+              latency,
+            );
+          } else {
+            onDetectionJS(null, latency);
+          }
         }
-        // Note: can't call setState from worklet directly, need Shared Values
-        // For now we just log — will wire up with useSharedValue in Phase 2
+      } catch {
+        // Model inference error — skip frame
       }
     },
-    [model, resize],
+    [model, onDetectionJS],
   );
 
   if (!device) {
@@ -99,16 +134,33 @@ export default function CameraScreen() {
         device={device}
         isActive={true}
         frameProcessor={frameProcessor}
-        pixelFormat="rgb"
+        pixelFormat="yuv"
       />
+
+      {/* Bounding box overlay */}
+      {bbox && (
+        <View
+          style={[
+            styles.bbox,
+            {
+              left: bbox.x,
+              top: bbox.y,
+              width: bbox.width,
+              height: bbox.height,
+            },
+          ]}
+        />
+      )}
+
+      {/* Face guide */}
       <View style={styles.overlay}>
         <View style={styles.faceGuide} />
         {yunet.state === 'loading' && (
-          <Text style={styles.status}>Loading face detection model...</Text>
+          <Text style={styles.status}>Loading model...</Text>
         )}
         {yunet.state === 'error' && (
           <Text style={[styles.status, styles.error]}>
-            Model load error: {yunet.error?.message}
+            Model error: {yunet.error?.message}
           </Text>
         )}
         {yunet.state === 'loaded' && (
@@ -116,6 +168,14 @@ export default function CameraScreen() {
             Position your face within the frame
           </Text>
         )}
+      </View>
+
+      {/* Debug info */}
+      <View style={styles.debugBar}>
+        <Text style={styles.debugText}>
+          {fps > 0 ? `${fps} FPS` : 'Waiting...'}
+          {bbox ? ` | Score: ${bbox.confidence.toFixed(2)}` : ''}
+        </Text>
       </View>
     </View>
   );
@@ -125,24 +185,25 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   message: {
     color: '#fff',
     fontSize: 16,
+    textAlign: 'center',
+    marginTop: 100,
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
+    pointerEvents: 'none',
   },
   faceGuide: {
     width: 250,
     height: 320,
     borderRadius: 125,
     borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.6)',
+    borderColor: 'rgba(255, 255, 255, 0.5)',
     borderStyle: 'dashed',
   },
   instruction: {
@@ -160,5 +221,26 @@ const styles = StyleSheet.create({
   error: {
     color: '#ff4444',
     opacity: 1,
+  },
+  bbox: {
+    position: 'absolute',
+    borderWidth: 2,
+    borderColor: '#00ff00',
+    borderRadius: 4,
+  },
+  debugBar: {
+    position: 'absolute',
+    top: 50,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  debugText: {
+    color: '#0f0',
+    fontSize: 14,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
 });
