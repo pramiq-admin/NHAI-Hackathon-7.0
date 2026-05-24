@@ -1,11 +1,18 @@
 import React from 'react';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
-import AppNavigator from './src/app/navigation/AppNavigator';
+import {NavigationContainer} from '@react-navigation/native';
+import {ThemeProvider} from './src/app/theme/ThemeContext';
+import RootStack from './src/app/navigation/RootStack';
+import './src/i18n';
 
 export default function App() {
   return (
-    <SafeAreaProvider>
-      <AppNavigator />
-    </SafeAreaProvider>
+    <ThemeProvider>
+      <SafeAreaProvider>
+        <NavigationContainer>
+          <RootStack />
+        </NavigationContainer>
+      </SafeAreaProvider>
+    </ThemeProvider>
   );
 }

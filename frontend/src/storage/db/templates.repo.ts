@@ -1,0 +1,94 @@
+import {getDb} from './dbClient';
+import type {Template} from '../vectorMatch';
+
+function generateId(): string {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+export function insertTemplate(
+  userId: string,
+  name: string,
+  embedding: number[],
+  bioHash?: string,
+  salt?: string,
+): string {
+  const db = getDb();
+  const id = generateId();
+  const embJson = JSON.stringify(embedding);
+
+  db.execute(
+    'INSERT INTO templates (id, user_id, name, emb, bio_hash, salt) VALUES (?, ?, ?, ?, ?, ?)',
+    [id, userId, name, embJson, bioHash ?? null, salt ?? null],
+  );
+
+  return id;
+}
+
+export function getAllTemplates(): Template[] {
+  const db = getDb();
+  const result = db.execute('SELECT id, user_id, name, emb FROM templates');
+
+  const templates: Template[] = [];
+  if (result.rows) {
+    for (let i = 0; i < result.rows.length; i++) {
+      const row = result.rows.item(i);
+      templates.push({
+        id: row.id,
+        userId: row.user_id,
+        name: row.name,
+        embedding: JSON.parse(row.emb),
+      });
+    }
+  }
+  return templates;
+}
+
+export function getTemplatesByUser(userId: string): Template[] {
+  const db = getDb();
+  const result = db.execute(
+    'SELECT id, user_id, name, emb FROM templates WHERE user_id = ?',
+    [userId],
+  );
+
+  const templates: Template[] = [];
+  if (result.rows) {
+    for (let i = 0; i < result.rows.length; i++) {
+      const row = result.rows.item(i);
+      templates.push({
+        id: row.id,
+        userId: row.user_id,
+        name: row.name,
+        embedding: JSON.parse(row.emb),
+      });
+    }
+  }
+  return templates;
+}
+
+export function deleteTemplate(id: string): void {
+  const db = getDb();
+  db.execute('DELETE FROM templates WHERE id = ?', [id]);
+}
+
+export function getTemplateCount(): number {
+  const db = getDb();
+  const result = db.execute('SELECT COUNT(*) as cnt FROM templates');
+  return result.rows?.item(0)?.cnt ?? 0;
+}
+
+export function getBioHashData(
+  id: string,
+): {bioHash: string; salt: string} | null {
+  const db = getDb();
+  const result = db.execute(
+    'SELECT bio_hash, salt FROM templates WHERE id = ?',
+    [id],
+  );
+  if (result.rows && result.rows.length > 0) {
+    const row = result.rows.item(0);
+    if (row.bio_hash && row.salt) {
+      return {bioHash: row.bio_hash, salt: row.salt};
+    }
+  }
+  return null;
+}

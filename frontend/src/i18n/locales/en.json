@@ -1,0 +1,80 @@
+{
+  "app_name": "NHAI Face Auth",
+  "home": {
+    "title": "Face Authentication",
+    "subtitle": "National Highways Authority of India",
+    "enroll": "Enroll",
+    "verify": "Verify",
+    "admin": "Admin"
+  },
+  "enroll": {
+    "title": "Enroll New Face",
+    "enter_id": "Enter Employee ID",
+    "enter_name": "Enter Name",
+    "start": "Start Enrollment",
+    "step_frontal": "Look straight at the camera",
+    "step_left": "Turn your head slightly LEFT",
+    "step_right": "Turn your head slightly RIGHT",
+    "capture_btn": "Capture",
+    "capturing": "Hold still — capturing...",
+    "captured": "Captured!",
+    "processing": "Processing enrollment...",
+    "success": "Enrollment successful!",
+    "fail": "Enrollment failed. Please retry.",
+    "quality_low": "Low quality — move to better lighting",
+    "no_face": "No face detected — position in frame",
+    "step": "Step {{current}} of {{total}}",
+    "error_fields": "Please enter both ID and name."
+  },
+  "verify": {
+    "title": "Verify Identity",
+    "position_face": "Position your face within the frame",
+    "matched": "Verified: {{name}}",
+    "no_match": "Face not recognized",
+    "low_quality": "Low quality capture",
+    "no_templates": "No templates enrolled",
+    "score": "Score: {{score}}",
+    "latency": "{{ms}}ms",
+    "no_face_timeout": "No face detected — please position your face in the frame"
+  },
+  "admin": {
+    "title": "Admin Panel",
+    "enrolled_count": "Enrolled Templates",
+    "db_size": "Database Size",
+    "language": "Language",
+    "language_en": "English",
+    "language_hi": "Hindi",
+    "outdoor_mode": "AAA Outdoor Mode",
+    "delete_all": "Delete All Templates",
+    "delete_confirm": "Are you sure? This cannot be undone.",
+    "deleted": "All templates deleted",
+    "template_deleted": "Template deleted",
+    "benchmark": "Run Benchmark",
+    "no_templates": "No templates enrolled"
+  },
+  "liveness": {
+    "start": "Start Liveness Check",
+    "checking": "Verifying liveness...",
+    "spoof_detected": "Spoof detected — use a real face",
+    "passed": "Liveness verified!",
+    "failed": "Liveness check failed"
+  },
+  "challenge": {
+    "blink": "Please blink",
+    "head_left": "Turn head LEFT",
+    "head_right": "Turn head RIGHT",
+    "smile": "Please smile",
+    "look_camera": "Look at the camera",
+    "passed": "Challenge passed!",
+    "failed": "Challenge failed — retry"
+  },
+  "common": {
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "retry": "Retry",
+    "back": "Back",
+    "delete": "Delete",
+    "loading": "Loading...",
+    "error": "Error"
+  }
+}

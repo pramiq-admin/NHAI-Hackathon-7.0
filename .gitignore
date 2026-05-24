@@ -57,6 +57,18 @@ datasets/
 # Docker
 docker-compose.override.yml
 
+# Android build intermediates
+frontend/android/app/.cxx/
+frontend/android/app/src/main/assets/
+frontend/android/app/src/main/res/drawable-*/
+frontend/android/app/src/main/res/raw/
+frontend/android/local.properties
+*.apk
+
+# Model conversion intermediates
+*_savedmodel/
+*.onnx.data
+
 # Misc
 *.log
 coverage/
