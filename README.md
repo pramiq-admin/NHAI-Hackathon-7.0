@@ -4,6 +4,24 @@
 
 On-device AI face recognition for NHAI highway workforce attendance — offline-first, privacy-preserving, built for Indian demographics. Works on Rs 12,000 phones with <300ms latency.
 
+## 🎥 Demo Video
+
+https://github.com/user-attachments/assets/683d9cca-107a-47d5-9b51-bf5f6ba8fa67
+
+📊 **Pitch deck:** [NHAI Hackathon 7.0 Pitch Deck (PDF)](./NHAI%20Hackathon%207.0%20Pitch%20Deck.pdf)
+
+---
+
+> ⚠️ **PROPRIETARY — Copyright © 2026 Sahil Chandel. All Rights Reserved.**
+>
+> This repository is **source-available for NHAI Hackathon 7.0 evaluation only — it is NOT open-source.**
+> **Unauthorized cloning, copying, forking, use, modification, or distribution is strictly prohibited** and
+> constitutes copyright infringement under the **Indian Copyright Act, 1957 (Sections 63–65 — civil & criminal
+> liability)** and international treaties (Berne Convention). Any use requires the author's **prior written
+> permission**. The author reserves the right to pursue **legal action** against unauthorized use. See [LICENSE](./LICENSE).
+
+---
+
 ## Problem
 
 NHAI manages 1,50,000+ highway workers across India. Current biometric attendance is fraud-prone (buddy punching, ghost workers), costing an estimated Rs 230 Cr annually. Existing systems need constant connectivity, expensive hardware, and fail outdoors.
@@ -163,4 +181,13 @@ Backend: 13 tests passed
 
 ## License
 
-MIT
+**Proprietary — Copyright © 2026 Sahil Chandel. All Rights Reserved.**
+
+This project is **source-available for NHAI Hackathon 7.0 evaluation only** and is **NOT** released under any
+open-source license (MIT/Apache/etc.). No permission is granted to copy, clone, fork, use, modify, or distribute
+the source code, models, documentation, slides, or demo video without the author's **prior written consent**.
+Unauthorized use constitutes copyright infringement under the **Indian Copyright Act, 1957 (Sections 63–65)** and may
+result in **civil and criminal liability**. Full terms: [LICENSE](./LICENSE).
+
+> Third-party dependencies remain under their own open-source licenses (MIT / Apache-2.0 / BSD-3). This proprietary
+> notice applies to the original work in this repository.

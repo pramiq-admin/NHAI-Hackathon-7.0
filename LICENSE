@@ -1,0 +1,57 @@
+NHAI Face Authentication System
+Copyright (c) 2026 Sahil Chandel. All Rights Reserved.
+
+PROPRIETARY AND CONFIDENTIAL — SOURCE-AVAILABLE FOR EVALUATION ONLY.
+THIS IS NOT AN OPEN-SOURCE LICENSE.
+
+This repository and all of its contents — including but not limited to the
+source code, machine-learning models, documentation, designs, pitch deck,
+slides, and demonstration video (collectively, the "Work") — are the original,
+copyrighted intellectual property of Sahil Chandel ("the Author"), created as a
+submission for NHAI Hackathon 7.0.
+
+The Work is made publicly visible ("source-available") for the SOLE purpose of
+allowing the hackathon organizers, judges, and authorized reviewers to evaluate
+it. PUBLIC VISIBILITY DOES NOT GRANT ANY LICENSE, RIGHT, OR PERMISSION TO USE
+THE WORK.
+
+NO PERMISSION IS GRANTED, expressly or by implication, estoppel, or otherwise,
+to any person or entity to:
+  - copy, clone, fork, download, mirror, or otherwise reproduce the Work, in
+    whole or in part;
+  - use, run, deploy, host, or incorporate the Work, or any portion of it, in
+    any product, service, or project;
+  - modify, adapt, translate, decompile, or create derivative works from the
+    Work;
+  - distribute, publish, transmit, sublicense, lease, sell, or share the Work;
+  - remove, alter, obscure, or falsify this notice or any copyright,
+    attribution, or proprietary marking,
+without the PRIOR WRITTEN CONSENT of the Author.
+
+Copyright in the Work subsists automatically from the moment of its creation
+under the Indian Copyright Act, 1957, and is protected internationally under
+the Berne Convention for the Protection of Literary and Artistic Works.
+Unauthorized reproduction, use, or distribution of the Work constitutes
+copyright infringement and may expose the infringer to:
+  - civil liability, including injunctions, delivery-up, and damages or an
+    account of profits; and
+  - criminal liability under Sections 63 to 65 of the Copyright Act, 1957,
+    which provide for imprisonment and/or fine for infringement; and
+  - additional remedies available under the Information Technology Act, 2000,
+    where applicable.
+
+The Author expressly reserves all rights, remedies, and causes of action,
+including the right to pursue legal action against any unauthorized use.
+
+If you wish to use, license, or obtain any rights in any part of this Work, you
+must first obtain the Author's written permission. Contact: Sahil Chandel.
+
+Third-party dependencies referenced or used by the Work remain governed by
+their own respective open-source licenses (e.g., MIT, Apache-2.0, BSD-3); this
+proprietary license applies only to the original Work authored by the Author.
+
+THE WORK IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHOR BE LIABLE
+FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM, OUT OF, OR IN
+CONNECTION WITH THE WORK OR THE USE OR OTHER DEALINGS IN THE WORK.
