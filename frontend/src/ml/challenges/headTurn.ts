@@ -21,18 +21,14 @@ export function updateHeadTurnState(
   if (state === 'passed' || state === 'failed') return state;
   if (elapsedMs > THRESHOLDS.CHALLENGE_STEP_TIMEOUT_MS) return 'failed';
 
-  const isTurned =
-    direction === 'left'
-      ? yawAngle < -THRESHOLDS.YAW_TURN_DEG
-      : yawAngle > THRESHOLDS.YAW_TURN_DEG;
-  const isCenter = Math.abs(yawAngle) < THRESHOLDS.YAW_CENTER_DEG;
+  // Direction-agnostic: any large head turn passes (mirror-safe for front camera).
+  // The challenge proves intentional motion; specific direction enforcement is
+  // skipped because front-camera yaw sign convention varies by device/OS.
+  const isTurned = Math.abs(yawAngle) > THRESHOLDS.YAW_TURN_DEG;
 
-  switch (state) {
-    case 'waiting_turn':
-      return isTurned ? 'waiting_return' : 'waiting_turn';
-    case 'waiting_return':
-      return isCenter ? 'passed' : 'waiting_return';
-    default:
-      return state;
+  if (state === 'waiting_turn') {
+    // Pass immediately on threshold crossing — no return-to-center required.
+    return isTurned ? 'passed' : 'waiting_turn';
   }
+  return state;
 }

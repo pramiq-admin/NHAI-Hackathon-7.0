@@ -1,0 +1,83 @@
+{
+  "dashboard": {
+    "title": "NHAI Face Auth - HQ Dashboard",
+    "uid": "nhai-hq",
+    "timezone": "Asia/Kolkata",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Compliance % by Zone",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{handler=\"/api/v1/attendance\",method=\"POST\",status=\"200\"}[1h]))",
+            "legendFormat": "Verified Events / hr"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 50},
+                {"color": "green", "value": 80}
+              ]
+            },
+            "unit": "percent"
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "API Latency p95",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{handler=~\"/api/v1/.*\"}[5m])) by (le, handler))",
+            "legendFormat": "{{handler}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {"unit": "s"}
+        }
+      },
+      {
+        "id": 3,
+        "title": "Attendance Events (24h)",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "sum(increase(http_requests_total{handler=\"/api/v1/attendance\",method=\"POST\",status=\"200\"}[1h]))",
+            "legendFormat": "Events synced / hr"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Device Distribution",
+        "type": "piechart",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "targets": [
+          {
+            "expr": "count by (device_id) (http_requests_total{handler=\"/api/v1/attendance\"})",
+            "legendFormat": "{{device_id}}"
+          }
+        ]
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "datasource",
+          "type": "datasource",
+          "query": "prometheus"
+        }
+      ]
+    },
+    "time": {"from": "now-24h", "to": "now"},
+    "refresh": "30s"
+  }
+}

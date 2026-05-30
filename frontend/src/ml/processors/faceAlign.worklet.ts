@@ -1,3 +1,12 @@
+/**
+ * Face alignment via ArcFace 5-point landmark similarity transform.
+ *
+ * Currently NOT called from the frame processor — react-native-fast-tflite
+ * auto-resizes the camera frame to EdgeFace's 112x112 input shape, which is
+ * functional but suboptimal (includes background). Use these helpers when
+ * porting alignment to a native frame processor plugin for Phase 8 accuracy
+ * tuning, or when `frame.toArrayBuffer()` is wired up for CPU-side cropping.
+ */
 import type {FaceDetection} from './faceDetect.worklet';
 
 // ArcFace canonical landmark positions for 112x112

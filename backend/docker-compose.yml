@@ -1,0 +1,65 @@
+# All credentials are read from the .env file alongside this compose file.
+# A `.env.example` is committed; copy it to `.env`, override the secrets, then
+# `docker compose up`. Nothing sensitive is hard-coded here anymore.
+#
+# Networking: the Postgres port is bound to 127.0.0.1 (not 0.0.0.0) so it is
+# unreachable from the host's external interfaces by default.
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?must set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?must set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:?must set POSTGRES_DB in .env}
+    ports:
+      - "127.0.0.1:5432:5432"   # host-loopback only — never 0.0.0.0
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
+      interval: 5s
+      retries: 5
+
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      ENV: ${ENV:-dev}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      JWT_SECRET: ${JWT_SECRET:?must set JWT_SECRET in .env}
+      AADHAR_PEPPER: ${AADHAR_PEPPER:?must set AADHAR_PEPPER in .env}
+      CORS_ORIGINS: ${CORS_ORIGINS:-["*"]}
+      DEVICE_TOKEN_ENABLED: ${DEVICE_TOKEN_ENABLED:-false}
+      DEVICE_SHARED_SECRET: ${DEVICE_SHARED_SECRET:-disabled}
+      METRICS_BEARER_TOKEN: ${METRICS_BEARER_TOKEN:-}
+      INTEGRITY_REQUIRED: ${INTEGRITY_REQUIRED:-false}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "127.0.0.1:9090:9090"   # host-loopback only
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    depends_on:
+      - api
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "127.0.0.1:3000:3000"   # host-loopback only
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?must set GRAFANA_ADMIN_PASSWORD in .env}
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+
+volumes:
+  pgdata:
+  grafana_data:

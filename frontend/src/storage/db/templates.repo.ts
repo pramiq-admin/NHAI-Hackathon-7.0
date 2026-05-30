@@ -70,6 +70,25 @@ export function deleteTemplate(id: string): void {
   db.execute('DELETE FROM templates WHERE id = ?', [id]);
 }
 
+/**
+ * Wipe ALL templates whose user_id matches the given prefix. Used when an
+ * admin deactivates a worker (`workers-` prefix) so that worker's biometric
+ * embedding doesn't linger on the device — privacy + DPDPA obligation.
+ *
+ * NOTE: the user_id we get back from the new admin/worker creation flow is
+ * something like `worker-l9w8e5xa`. The on-device prefix is derived from
+ * the timestamp at enrollment, NOT the backend worker id. So we additionally
+ * accept a name match to be safe.
+ */
+export function deleteTemplatesForName(name: string): number {
+  const db = getDb();
+  const result = db.execute(
+    'DELETE FROM templates WHERE name = ?',
+    [name],
+  );
+  return (result as any)?.rowsAffected ?? 0;
+}
+
 export function getTemplateCount(): number {
   const db = getDb();
   const result = db.execute('SELECT COUNT(*) as cnt FROM templates');

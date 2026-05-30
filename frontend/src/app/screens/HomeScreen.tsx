@@ -1,9 +1,18 @@
 import React from 'react';
-import {View, Text, TouchableOpacity, StyleSheet, StatusBar} from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  StatusBar,
+  ScrollView,
+  SafeAreaView,
+} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import type {RootStackParamList} from '../navigation/RootStack';
 import {useThemeContext} from '../theme/ThemeContext';
+import {COLORS} from '../theme/aaaTheme';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Home'>;
@@ -12,132 +21,254 @@ type Props = {
 export default function HomeScreen({navigation}: Props) {
   const {isAAA} = useThemeContext();
   const {t} = useTranslation();
+  const c = isAAA ? COLORS.aaa : COLORS.normal;
 
   return (
-    <View style={[styles.container, isAAA && styles.containerAAA]}>
-      <StatusBar barStyle="light-content" backgroundColor="#000" />
+    <SafeAreaView style={[styles.container, {backgroundColor: c.bg}]}>
+      <StatusBar barStyle="light-content" backgroundColor={c.bg} />
 
-      <View style={styles.header}>
-        <Text style={[styles.title, isAAA && styles.titleAAA]}>
-          {t('home.title')}
-        </Text>
-        <Text style={[styles.subtitle, isAAA && styles.subtitleAAA]}>
-          {t('home.subtitle')}
-        </Text>
-      </View>
+      <ScrollView contentContainerStyle={styles.scroll}>
+        {/* Header band — NHAI branding */}
+        <View style={[styles.headerBand, {backgroundColor: c.surface}]}>
+          <View style={styles.headerRow}>
+            <View style={[styles.logoCircle, {borderColor: c.accent}]}>
+              <Text style={[styles.logoText, {color: c.accent}]}>NFA</Text>
+            </View>
+            <View style={styles.headerTitleBlock}>
+              <Text style={[styles.appTitle, {color: c.text}]}>
+                NHAI Face Auth
+              </Text>
+              <Text style={[styles.appSubtitle, {color: c.textSecondary}]}>
+                {t('home.subtitle')}
+              </Text>
+            </View>
+          </View>
+          {/* Decorative road accent */}
+          <View style={[styles.roadAccent, {backgroundColor: c.accent}]} />
+        </View>
 
-      <View style={styles.buttons}>
+        {/* Greeting */}
+        <View style={styles.greeting}>
+          <Text style={[styles.greetingHi, {color: c.text}]}>नमस्ते 🙏</Text>
+          <Text style={[styles.greetingSub, {color: c.textSecondary}]}>
+            Worker attendance system
+          </Text>
+        </View>
+
+        {/* Primary action — Verify (large card) */}
         <TouchableOpacity
-          style={[styles.btn, styles.btnPrimary, isAAA && styles.btnAAA]}
+          activeOpacity={0.8}
+          style={[
+            styles.primaryCard,
+            {backgroundColor: c.primary, shadowColor: c.primary},
+          ]}
           onPress={() => navigation.navigate('Verify')}>
-          <Text style={[styles.btnText, isAAA && styles.btnTextAAA]}>
-            {t('home.verify')}
-          </Text>
+          <View style={styles.cardIconWrap}>
+            <Text style={styles.cardIcon}>📸</Text>
+          </View>
+          <View style={styles.cardContent}>
+            <Text style={[styles.cardTitle, {color: '#fff'}]}>
+              {t('home.verify')}
+            </Text>
+            <Text style={[styles.cardSubtitle, {color: 'rgba(255,255,255,0.85)'}]}>
+              Check-in with face
+            </Text>
+          </View>
+          <Text style={[styles.cardArrow, {color: '#fff'}]}>→</Text>
         </TouchableOpacity>
 
+        {/* Secondary action — Enroll */}
         <TouchableOpacity
-          style={[styles.btn, styles.btnSecondary, isAAA && styles.btnSecondaryAAA]}
+          activeOpacity={0.8}
+          style={[
+            styles.secondaryCard,
+            {
+              backgroundColor: c.surface,
+              borderColor: c.accent,
+              borderWidth: isAAA ? 2 : 1.5,
+            },
+          ]}
           onPress={() => navigation.navigate('Enroll')}>
-          <Text style={[styles.btnText, isAAA && styles.btnTextAAA]}>
-            {t('home.enroll')}
-          </Text>
+          <View style={styles.cardIconWrap}>
+            <Text style={styles.cardIcon}>➕</Text>
+          </View>
+          <View style={styles.cardContent}>
+            <Text style={[styles.cardTitle, {color: c.text}]}>
+              {t('home.enroll')}
+            </Text>
+            <Text style={[styles.cardSubtitle, {color: c.textSecondary}]}>
+              Register a new worker
+            </Text>
+          </View>
+          <Text style={[styles.cardArrow, {color: c.accent}]}>→</Text>
         </TouchableOpacity>
 
+        {/* Tertiary — Admin */}
         <TouchableOpacity
-          style={[styles.btn, styles.btnOutline, isAAA && styles.btnOutlineAAA]}
+          activeOpacity={0.8}
+          style={[styles.adminPill, {borderColor: c.border}]}
           onPress={() => navigation.navigate('Admin')}>
-          <Text style={[styles.btnTextOutline, isAAA && styles.btnTextOutlineAAA]}>
+          <Text style={[styles.adminIcon, {color: c.textSecondary}]}>⚙️</Text>
+          <Text style={[styles.adminText, {color: c.textSecondary}]}>
             {t('home.admin')}
           </Text>
         </TouchableOpacity>
-      </View>
-    </View>
+
+        {/* Footer — feature badges */}
+        <View style={styles.featureRow}>
+          <View style={[styles.featureBadge, {borderColor: c.success}]}>
+            <Text style={[styles.featureBadgeText, {color: c.success}]}>
+              ✓ Offline
+            </Text>
+          </View>
+          <View style={[styles.featureBadge, {borderColor: c.primary}]}>
+            <Text style={[styles.featureBadgeText, {color: c.primary}]}>
+              🔒 BioHash
+            </Text>
+          </View>
+          <View style={[styles.featureBadge, {borderColor: c.accent}]}>
+            <Text style={[styles.featureBadgeText, {color: c.accent}]}>
+              🇮🇳 DPDPA
+            </Text>
+          </View>
+        </View>
+
+        <Text style={[styles.versionText, {color: c.textMuted}]}>
+          v1.0 • Powered by EdgeFace + ML Kit
+        </Text>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0f0f23',
+  container: {flex: 1},
+  scroll: {padding: 20, paddingBottom: 40},
+  headerBand: {
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 24,
+    overflow: 'hidden',
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  logoCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 2,
     justifyContent: 'center',
-    paddingHorizontal: 32,
-  },
-  containerAAA: {
-    backgroundColor: '#000',
-  },
-  header: {
     alignItems: 'center',
-    marginBottom: 60,
+    backgroundColor: 'rgba(0,0,0,0.25)',
   },
-  title: {
-    color: '#fff',
-    fontSize: 28,
+  logoText: {
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  headerTitleBlock: {flex: 1},
+  appTitle: {
+    fontSize: 20,
     fontWeight: '700',
-    textAlign: 'center',
+    letterSpacing: 0.3,
   },
-  titleAAA: {
-    fontSize: 36,
-    color: '#ffdd00',
+  appSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
   },
-  subtitle: {
-    color: '#aaa',
+  roadAccent: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    opacity: 0.7,
+  },
+  greeting: {marginBottom: 24, paddingHorizontal: 4},
+  greetingHi: {
+    fontSize: 26,
+    fontWeight: '700',
+  },
+  greetingSub: {
     fontSize: 14,
-    marginTop: 8,
-    textAlign: 'center',
+    marginTop: 4,
   },
-  subtitleAAA: {
-    fontSize: 18,
-    color: '#ffdd00',
-  },
-  buttons: {
-    gap: 16,
-  },
-  btn: {
-    paddingVertical: 16,
-    borderRadius: 12,
+  primaryCard: {
+    borderRadius: 18,
+    padding: 20,
+    flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 14,
+    shadowOffset: {width: 0, height: 8},
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
   },
-  btnAAA: {
-    paddingVertical: 22,
-    borderRadius: 16,
+  secondaryCard: {
+    borderRadius: 18,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
   },
-  btnPrimary: {
-    backgroundColor: '#0096ff',
+  cardIconWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
   },
-  btnSecondary: {
-    backgroundColor: '#1a1a2e',
+  cardIcon: {fontSize: 26},
+  cardContent: {flex: 1},
+  cardTitle: {
+    fontSize: 19,
+    fontWeight: '700',
+  },
+  cardSubtitle: {
+    fontSize: 13,
+    marginTop: 2,
+  },
+  cardArrow: {
+    fontSize: 24,
+    fontWeight: '300',
+  },
+  adminPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#0096ff',
+    marginTop: 8,
+    gap: 8,
   },
-  btnSecondaryAAA: {
-    backgroundColor: '#1a1a00',
-    borderWidth: 2,
-    borderColor: '#ffdd00',
+  adminIcon: {fontSize: 16},
+  adminText: {fontSize: 14, fontWeight: '600'},
+  featureRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 28,
   },
-  btnOutline: {
-    backgroundColor: 'transparent',
+  featureBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#444',
   },
-  btnOutlineAAA: {
-    borderWidth: 2,
-    borderColor: '#ffdd00',
-  },
-  btnText: {
-    color: '#fff',
-    fontSize: 18,
+  featureBadgeText: {
+    fontSize: 11,
     fontWeight: '600',
   },
-  btnTextAAA: {
-    fontSize: 24,
-    fontWeight: '700',
-  },
-  btnTextOutline: {
-    color: '#aaa',
-    fontSize: 16,
-  },
-  btnTextOutlineAAA: {
-    color: '#ffdd00',
-    fontSize: 20,
+  versionText: {
+    fontSize: 10,
+    textAlign: 'center',
+    marginTop: 16,
   },
 });

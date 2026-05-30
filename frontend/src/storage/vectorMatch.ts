@@ -32,7 +32,8 @@ export function cosineSimilarity(a: number[], b: number[]): number {
 
 export function findBestMatch(
   embedding: number[],
-  threshold: number,
+  globalThreshold: number,
+  getUserThreshold?: (userId: string) => number,
 ): MatchResult | null {
   let bestScore = -1;
   let bestTemplate: Template | null = null;
@@ -45,13 +46,18 @@ export function findBestMatch(
     }
   }
 
-  if (bestTemplate && bestScore >= threshold) {
-    return {
-      id: bestTemplate.id,
-      userId: bestTemplate.userId,
-      name: bestTemplate.name,
-      score: bestScore,
-    };
+  if (bestTemplate) {
+    const threshold = getUserThreshold
+      ? getUserThreshold(bestTemplate.userId)
+      : globalThreshold;
+    if (bestScore >= threshold) {
+      return {
+        id: bestTemplate.id,
+        userId: bestTemplate.userId,
+        name: bestTemplate.name,
+        score: bestScore,
+      };
+    }
   }
 
   return null;

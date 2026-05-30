@@ -1,7 +1,12 @@
 import {useState, useCallback, useRef} from 'react';
-import {enrollFace} from '../../ml/pipeline';
+import {enrollFace, DuplicateFaceError, type EnrolledRole} from '../../ml/pipeline';
 
 export type EnrollStep = 'idle' | 'frontal' | 'left' | 'right' | 'processing' | 'done' | 'error';
+
+export type DuplicateInfo = {
+  existingRole: EnrolledRole;
+  existingName: string;
+};
 
 const STEPS: EnrollStep[] = ['frontal', 'left', 'right'];
 const STEP_LABELS = {
@@ -17,6 +22,10 @@ export function useEnrollment() {
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [enrolledId, setEnrolledId] = useState<string | null>(null);
+  // When the failure is a known DuplicateFaceError, we surface structured info
+  // so the originating screen (admin signup / add worker) can render a
+  // role-aware message ("you are already a worker") instead of a raw string.
+  const [duplicate, setDuplicate] = useState<DuplicateInfo | null>(null);
 
   const embeddings = useRef<number[][]>([]);
   const stepIndexRef = useRef(0);
@@ -34,6 +43,7 @@ export function useEnrollment() {
     setStep('frontal');
     setError(null);
     setEnrolledId(null);
+    setDuplicate(null);
     embeddings.current = [];
     processingRef.current = false;
   }, []);
@@ -78,6 +88,12 @@ export function useEnrollment() {
           setStep('done');
         } catch (e: any) {
           setError(e?.message ?? 'Enrollment failed');
+          if (e instanceof DuplicateFaceError) {
+            setDuplicate({
+              existingRole: e.existingRole,
+              existingName: e.existingName,
+            });
+          }
           setStep('error');
         }
       }
@@ -95,6 +111,7 @@ export function useEnrollment() {
     nameRef.current = '';
     setError(null);
     setEnrolledId(null);
+    setDuplicate(null);
     embeddings.current = [];
     processingRef.current = false;
   }, []);
@@ -107,6 +124,7 @@ export function useEnrollment() {
     userId,
     name,
     error,
+    duplicate,
     enrolledId,
     setUserId,
     setName,

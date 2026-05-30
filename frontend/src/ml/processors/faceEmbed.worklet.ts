@@ -19,21 +19,27 @@ export function extractEmbedding(
 
     if (!outputs || outputs.length === 0) return null;
 
-    const raw = outputs[0] as unknown as Float32Array;
-    if (!raw || raw.length !== 512) return null;
+    const raw = outputs[0] as any;
+    if (!raw) return null;
+
+    // Accept any output length >= 128 (typical embedding sizes vary by model)
+    const len = raw.length ?? 0;
+    if (len < 128) return null;
+
+    const effectiveLen = Math.min(len, 512);
 
     // MagFace quality: L2 norm before normalization correlates with quality
     let sumSq = 0;
-    for (let i = 0; i < 512; i++) {
+    for (let i = 0; i < effectiveLen; i++) {
       sumSq += raw[i] * raw[i];
     }
     const magnitude = Math.sqrt(sumSq);
 
-    // L2-normalize for cosine similarity
+    // L2-normalize for cosine similarity; pad/truncate to 512-d
     const embedding: number[] = new Array(512);
     if (magnitude > 1e-8) {
       for (let i = 0; i < 512; i++) {
-        embedding[i] = raw[i] / magnitude;
+        embedding[i] = i < effectiveLen ? raw[i] / magnitude : 0;
       }
     } else {
       for (let i = 0; i < 512; i++) {

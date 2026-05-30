@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -sS -w '\\\\n→ HTTP %{http_code}  \\(time=%{time_total}s\\)\\\\n' -X POST http://127.0.0.1:8000/api/v1/admin/signup -H 'Content-Type: application/json' -d '{\"name\":\"Test\",\"mobile\":\"9999999999\",\"aadhar\":\"123456789012\"}')",
+      "Bash(grep -v \"^$\")"
+    ]
+  }
+}

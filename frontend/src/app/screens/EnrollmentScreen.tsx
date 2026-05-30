@@ -1,4 +1,4 @@
-import React, {useEffect, useCallback} from 'react';
+import React, {useEffect, useCallback, useRef} from 'react';
 import {
   StyleSheet,
   Text,
@@ -7,6 +7,7 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import {
   Camera,
@@ -16,32 +17,45 @@ import {
 } from 'react-native-vision-camera';
 import {useTensorflowModel} from 'react-native-fast-tflite';
 import {useRunOnJS} from 'react-native-worklets-core';
+import {useFaceDetector} from 'react-native-vision-camera-face-detector';
 import {useTranslation} from 'react-i18next';
-import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import type {NativeStackNavigationProp, NativeStackScreenProps} from '@react-navigation/native-stack';
+import {useRoute, type RouteProp} from '@react-navigation/native';
 
-import {postProcessYuNet} from '../../ml/processors/faceDetect.worklet';
-import {extractEmbedding} from '../../ml/processors/faceEmbed.worklet';
-import {THRESHOLDS} from '../../ml/thresholds';
+import {extractMLKitSignature} from '../../ml/processors/mlkitSignature.worklet';
+import type {FaceDetection} from '../../ml/processors/faceDetect.worklet';
 import {useFaceAuth} from '../hooks/useFaceAuth';
 import {useEnrollment} from '../hooks/useEnrollment';
 import {useVoicePrompt} from '../components/VoicePrompt';
 import EnrollmentProgress from '../components/EnrollmentProgress';
 import {useThemeContext} from '../theme/ThemeContext';
 import type {RootStackParamList} from '../navigation/RootStack';
+import {
+  useFaceEnrollmentBus,
+  type EnrollmentPurpose,
+} from '../auth/faceEnrollmentBus';
 
-const YUNET_INPUT = 640;
-const CONFIDENCE_MIN = THRESHOLDS.DETECTION_CONFIDENCE;
-
-type Props = {
-  navigation: NativeStackNavigationProp<RootStackParamList, 'Enroll'>;
-};
+type Props = NativeStackScreenProps<RootStackParamList, 'Enroll'>;
 
 export default function EnrollmentScreen({navigation}: Props) {
+  const route = useRoute<RouteProp<RootStackParamList, 'Enroll'>>();
+  const params = route.params ?? {};
+  const purpose: EnrollmentPurpose = (params.purpose ?? 'standalone') as EnrollmentPurpose;
+  const returnTo = params.returnTo;
+  const prefilledUserId = params.prefilledUserId;
+  const prefilledName = params.prefilledName;
+  const handoffDoneRef = useRef(false);
+  const setPendingFaceEnrollment = useFaceEnrollmentBus(s => s.setPending);
+  const setBusError = useFaceEnrollmentBus(s => s.setError);
   const {t} = useTranslation();
   const {isAAA} = useThemeContext();
-  const {hasPermission} = useCameraPermission();
+  const {hasPermission, requestPermission} = useCameraPermission();
   const device = useCameraDevice('front');
   const {speak, stop} = useVoicePrompt();
+
+  useEffect(() => {
+    if (!hasPermission) requestPermission();
+  }, [hasPermission, requestPermission]);
 
   useEffect(() => {
     return () => stop();
@@ -51,44 +65,42 @@ export default function EnrollmentScreen({navigation}: Props) {
 
   const enrollment = useEnrollment();
 
-  const yunet = useTensorflowModel(
-    require('../../../assets/models/yunet_int8.tflite'),
-  );
-  const edgeface = useTensorflowModel(
-    require('../../../assets/models/edgeface_xs_int8.tflite'),
-  );
-
-  const yunetModel = yunet.state === 'loaded' ? yunet.model : undefined;
-  const edgefaceModel = edgeface.state === 'loaded' ? edgeface.model : undefined;
+  const faceDetector = useFaceDetector({
+    performanceMode: 'fast',
+    classificationMode: 'all',
+    landmarkMode: 'all',
+    minFaceSize: 0.2,
+  });
 
   const onFrameResultJS = useRunOnJS(onFrameResult, [onFrameResult]);
 
+  // ML Kit face detector → derive 512-d identity signature from landmarks+pose.
+  // (EdgeFace TFLite fails silently on this device; this fallback is robust.)
   const frameProcessor = useFrameProcessor(
     frame => {
       'worklet';
-      if (!yunetModel) return;
       const start = performance.now();
       try {
-        const out = yunetModel.runSync([frame as any]);
-        if (out && out.length >= 4) {
-          const dets = postProcessYuNet(
-            out as unknown as ArrayBuffer[],
-            YUNET_INPUT, YUNET_INPUT,
-            frame.width, frame.height,
-          );
-          const latency = performance.now() - start;
-          if (dets.length > 0 && edgefaceModel && dets[0].confidence > CONFIDENCE_MIN) {
-            const emb = extractEmbedding(edgefaceModel, frame);
-            onFrameResultJS(dets[0], emb, latency);
-          } else if (dets.length > 0) {
-            onFrameResultJS(dets[0], null, latency);
-          } else {
-            onFrameResultJS(null, null, latency);
-          }
+        const faces = faceDetector.detectFaces(frame);
+        const latency = performance.now() - start;
+        if (faces.length > 0) {
+          const f = faces[0];
+          const det: FaceDetection = {
+            x: f.bounds?.x ?? 0,
+            y: f.bounds?.y ?? 0,
+            width: f.bounds?.width ?? 0,
+            height: f.bounds?.height ?? 0,
+            confidence: 1.0,
+            landmarks: [],
+          };
+          const sig = extractMLKitSignature(f, frame.width, frame.height);
+          onFrameResultJS(det, sig, latency);
+        } else {
+          onFrameResultJS(null, null, latency);
         }
       } catch {}
     },
-    [yunetModel, edgefaceModel, onFrameResultJS],
+    [faceDetector, onFrameResultJS],
   );
 
   useEffect(() => {
@@ -106,6 +118,83 @@ export default function EnrollmentScreen({navigation}: Props) {
     }
   }, [enrollment.step, speak, t]);
 
+  // Auto-start when invoked with prefilled identity (admin signup / add worker)
+  useEffect(() => {
+    if (
+      enrollment.step === 'idle' &&
+      prefilledUserId &&
+      prefilledName &&
+      purpose !== 'standalone'
+    ) {
+      enrollment.setUserId(prefilledUserId);
+      enrollment.setName(prefilledName);
+      enrollment.startEnrollment(prefilledUserId, prefilledName);
+    }
+  }, [enrollment, prefilledUserId, prefilledName, purpose]);
+
+  // Hand off result to bus + navigate back when called by another screen.
+  // Handles BOTH success and error so the originating screen can react
+  // (a duplicate face captured during admin signup, for example, gets routed
+  // back as a structured bus error so AdminSignup can show a role-aware
+  // message instead of leaving the user stuck on a generic error view).
+  useEffect(() => {
+    if (purpose === 'standalone' || !returnTo || handoffDoneRef.current) {
+      return;
+    }
+
+    if (enrollment.step === 'done' && enrollment.enrolledId) {
+      handoffDoneRef.current = true;
+      setPendingFaceEnrollment(
+        purpose,
+        enrollment.enrolledId,
+        prefilledUserId || enrollment.userId,
+        prefilledName || enrollment.name,
+      );
+      const timer = setTimeout(() => {
+        enrollment.reset();
+        navigation.navigate(returnTo as any);
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+
+    if (enrollment.step === 'error') {
+      handoffDoneRef.current = true;
+      if (enrollment.duplicate) {
+        setBusError({
+          purpose,
+          code: 'duplicate_face',
+          existingRole: enrollment.duplicate.existingRole,
+          existingName: enrollment.duplicate.existingName,
+          message: enrollment.error ?? undefined,
+        });
+      } else {
+        setBusError({
+          purpose,
+          code: 'capture_failed',
+          message: enrollment.error ?? undefined,
+        });
+      }
+      const timer = setTimeout(() => {
+        enrollment.reset();
+        navigation.navigate(returnTo as any);
+      }, 1200);
+      return () => clearTimeout(timer);
+    }
+  }, [
+    enrollment.step,
+    enrollment.enrolledId,
+    enrollment.error,
+    enrollment.duplicate,
+    purpose,
+    returnTo,
+    setPendingFaceEnrollment,
+    setBusError,
+    prefilledUserId,
+    prefilledName,
+    enrollment,
+    navigation,
+  ]);
+
   const handleCapture = useCallback(() => {
     if (!latestEmbeddingRef.current) {
       Alert.alert(t('enroll.no_face'));
@@ -122,10 +211,25 @@ export default function EnrollmentScreen({navigation}: Props) {
     enrollment.startEnrollment(enrollment.userId.trim(), enrollment.name.trim());
   }, [enrollment]);
 
-  if (!device || !hasPermission) {
+  if (!hasPermission) {
     return (
       <View style={[styles.container, isAAA && styles.containerAAA]}>
-        <Text style={[styles.message, isAAA && styles.textAAA]}>{t('common.loading')}</Text>
+        <Text style={[styles.message, isAAA && styles.textAAA]}>{t('common.camera_required')}</Text>
+        <TouchableOpacity
+          style={styles.permissionBtn}
+          onPress={() => requestPermission().then(granted => {
+            if (!granted) Linking.openSettings();
+          })}>
+          <Text style={styles.permissionBtnText}>{t('common.grant_permission')}</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (!device) {
+    return (
+      <View style={[styles.container, isAAA && styles.containerAAA]}>
+        <Text style={[styles.message, isAAA && styles.textAAA]}>{t('common.no_camera')}</Text>
       </View>
     );
   }
@@ -264,97 +368,75 @@ export default function EnrollmentScreen({navigation}: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0f0f23',
-  },
-  containerAAA: {
-    backgroundColor: '#000',
-  },
+  container: {flex: 1, backgroundColor: '#0F172A'},
+  containerAAA: {backgroundColor: '#000'},
   message: {
-    color: '#fff',
+    color: '#F8FAFC',
     fontSize: 16,
     textAlign: 'center',
     marginTop: 100,
   },
-  textAAA: {
-    color: '#ffdd00',
-    fontSize: 18,
+  textAAA: {color: '#FFD700', fontSize: 18},
+  permissionBtn: {
+    marginTop: 24,
+    alignSelf: 'center',
+    backgroundColor: '#F59E0B',
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+    borderRadius: 12,
   },
+  permissionBtnText: {color: '#fff', fontSize: 16, fontWeight: '700'},
   form: {
     flex: 1,
     justifyContent: 'center',
-    paddingHorizontal: 32,
-    gap: 16,
+    paddingHorizontal: 28,
+    gap: 14,
   },
   title: {
-    color: '#fff',
-    fontSize: 24,
-    fontWeight: '700',
+    color: '#F8FAFC',
+    fontSize: 26,
+    fontWeight: '800',
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
+    letterSpacing: 0.3,
   },
-  titleAAA: {
-    color: '#ffdd00',
-    fontSize: 32,
-  },
+  titleAAA: {color: '#FFD700', fontSize: 34},
   input: {
-    backgroundColor: '#1a1a2e',
-    color: '#fff',
-    borderRadius: 8,
-    padding: 14,
+    backgroundColor: '#1E293B',
+    color: '#F8FAFC',
+    borderRadius: 14,
+    padding: 16,
     fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#333',
+    borderWidth: 1.5,
+    borderColor: '#334155',
   },
   inputAAA: {
     borderWidth: 2,
-    borderColor: '#ffdd00',
+    borderColor: '#FFD700',
     backgroundColor: '#1a1a00',
-    color: '#ffdd00',
+    color: '#FFD700',
     fontSize: 18,
   },
   startBtn: {
-    backgroundColor: '#0096ff',
-    paddingVertical: 16,
-    borderRadius: 12,
+    backgroundColor: '#3B82F6',
+    paddingVertical: 18,
+    borderRadius: 14,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 10,
+    shadowColor: '#3B82F6',
+    shadowOffset: {width: 0, height: 6},
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 8,
   },
-  startBtnAAA: {
-    backgroundColor: '#ffdd00',
-    paddingVertical: 22,
-    borderRadius: 16,
-  },
-  startBtnText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  startBtnTextAAA: {
-    color: '#000',
-    fontSize: 24,
-    fontWeight: '700',
-  },
-  backBtn: {
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  backBtnText: {
-    color: '#aaa',
-    fontSize: 14,
-  },
-  successText: {
-    color: '#00cc66',
-  },
-  errorText: {
-    color: '#ff4444',
-  },
-  errorDetail: {
-    color: '#ff8888',
-    fontSize: 14,
-    textAlign: 'center',
-  },
+  startBtnAAA: {backgroundColor: '#FFD700', paddingVertical: 22, borderRadius: 18},
+  startBtnText: {color: '#fff', fontSize: 18, fontWeight: '800', letterSpacing: 0.5},
+  startBtnTextAAA: {color: '#000', fontSize: 24},
+  backBtn: {paddingVertical: 12, alignItems: 'center'},
+  backBtnText: {color: '#94A3B8', fontSize: 14, fontWeight: '600'},
+  successText: {color: '#10B981'},
+  errorText: {color: '#EF4444'},
+  errorDetail: {color: '#FCA5A5', fontSize: 14, textAlign: 'center'},
   guideOverlay: {
     position: 'absolute',
     top: 0, left: 0, right: 0, bottom: 0,
@@ -362,90 +444,88 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   faceGuide: {
-    width: 250,
-    height: 320,
-    borderRadius: 125,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.5)',
+    width: 260,
+    height: 340,
+    borderRadius: 130,
+    borderWidth: 3,
+    borderColor: 'rgba(255,255,255,0.55)',
     borderStyle: 'dashed',
   },
-  faceGuideAAA: {
-    borderWidth: 4,
-    borderColor: '#ffdd00',
-  },
+  faceGuideAAA: {borderWidth: 5, borderColor: '#FFD700'},
   topBar: {
     position: 'absolute',
-    top: 50,
-    left: 0,
-    right: 0,
+    top: 50, left: 0, right: 0,
     alignItems: 'center',
   },
   stepInstruction: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
-    marginTop: 8,
+    color: '#F8FAFC',
+    fontSize: 16,
+    fontWeight: '700',
+    marginTop: 10,
     textAlign: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.5)',
   },
   stepInstructionAAA: {
-    fontSize: 24,
-    color: '#ffdd00',
-    backgroundColor: 'rgba(0,0,0,0.8)',
+    fontSize: 22,
+    color: '#FFD700',
+    backgroundColor: 'rgba(0,0,0,0.92)',
+    borderColor: '#FFD700',
+    borderWidth: 2,
   },
   bbox: {
     position: 'absolute',
-    borderWidth: 2,
-    borderColor: '#0096ff',
-    borderRadius: 4,
+    borderWidth: 2.5,
+    borderColor: '#10B981',
+    borderRadius: 8,
   },
   bottomBar: {
     position: 'absolute',
-    bottom: 40,
-    left: 0,
-    right: 0,
+    bottom: 35,
+    left: 0, right: 0,
     alignItems: 'center',
   },
   captureBtn: {
-    backgroundColor: '#0096ff',
-    paddingVertical: 16,
-    paddingHorizontal: 48,
-    borderRadius: 30,
+    backgroundColor: '#3B82F6',
+    paddingVertical: 18,
+    paddingHorizontal: 56,
+    borderRadius: 999,
+    shadowColor: '#3B82F6',
+    shadowOffset: {width: 0, height: 6},
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    elevation: 10,
   },
   captureBtnAAA: {
-    backgroundColor: '#ffdd00',
+    backgroundColor: '#FFD700',
     paddingVertical: 22,
-    paddingHorizontal: 56,
+    paddingHorizontal: 64,
   },
   captureBtnDisabled: {
-    backgroundColor: '#444',
+    backgroundColor: '#475569',
+    shadowOpacity: 0,
   },
-  captureBtnText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  captureBtnTextAAA: {
-    color: '#000',
-    fontSize: 24,
-    fontWeight: '700',
-  },
+  captureBtnText: {color: '#fff', fontSize: 18, fontWeight: '800', letterSpacing: 0.5},
+  captureBtnTextAAA: {color: '#000', fontSize: 24},
   debugBar: {
     position: 'absolute',
-    top: 140,
-    left: 0,
-    right: 0,
+    top: 130,
+    left: 0, right: 0,
     alignItems: 'center',
   },
   debugText: {
-    color: '#0f0',
+    color: '#F8FAFC',
     fontSize: 11,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
+    fontWeight: '600',
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.5)',
   },
 });

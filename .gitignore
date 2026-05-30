@@ -26,6 +26,7 @@ frontend/ios/build/
 .env
 .env.local
 .env.production
+backend/.env
 *.pem
 !frontend/assets/keys/model_signing_pubkey.pem
 .keys/
@@ -40,6 +41,9 @@ GoogleService-Info.plist
 *.swp
 *.swo
 *~
+
+# Claude Code (personal/local config)
+.claude/settings.local.json
 
 # OS
 .DS_Store

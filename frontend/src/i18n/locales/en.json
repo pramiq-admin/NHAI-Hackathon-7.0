@@ -1,5 +1,5 @@
 {
-  "app_name": "NHAI Face Auth",
+  "app_name": "NHAI Attendance",
   "home": {
     "title": "Face Authentication",
     "subtitle": "National Highways Authority of India",
@@ -57,7 +57,8 @@
     "checking": "Verifying liveness...",
     "spoof_detected": "Spoof detected — use a real face",
     "passed": "Liveness verified!",
-    "failed": "Liveness check failed"
+    "failed": "Liveness check failed",
+    "face_lost": "Face lost — look at the camera"
   },
   "challenge": {
     "blink": "Please blink",
@@ -75,6 +76,213 @@
     "back": "Back",
     "delete": "Delete",
     "loading": "Loading...",
-    "error": "Error"
+    "error": "Error",
+    "camera_required": "Camera permission is required",
+    "grant_permission": "Grant Camera Access",
+    "no_camera": "No front camera found on this device"
+  },
+  "welcome": {
+    "title": "NHAI Attendance",
+    "subtitle": "Face-verified worker attendance",
+    "worker_btn": "Login as Worker",
+    "worker_hint": "Use name + Aadhar to punch in/out",
+    "admin_btn": "Admin Login / Signup",
+    "admin_hint": "Register workers, view attendance",
+    "footer": "Offline-first • DPDPA-aware • Made in India"
+  },
+  "admin_auth": {
+    "title": "Admin Access",
+    "subtitle": "Login if you already have an account, or sign up as a new admin",
+    "login": "Login as Admin",
+    "login_hint": "Mobile + Aadhar",
+    "signup": "Signup as Admin",
+    "signup_hint": "Name, mobile, Aadhar, face"
+  },
+  "admin_signup": {
+    "title": "Create Admin Account",
+    "subtitle": "Fill your details and register your face",
+    "name_label": "Full Name",
+    "name_ph": "e.g. Ramesh Kumar",
+    "mobile_label": "Mobile Number",
+    "mobile_ph": "10-digit number",
+    "aadhar_label": "Aadhar Number",
+    "aadhar_helper": "Stored hashed — never as plain text",
+    "next": "Continue → Capture Face",
+    "face_pending": "Capturing face... follow on-screen prompts",
+    "submitting": "Creating your admin account...",
+    "success": "Welcome aboard!",
+    "face_ok": "Face registered",
+    "face_cancelled": "Face capture cancelled — please try again",
+    "dup_as_worker": "You are already registered as a worker ({{name}}). Cannot register as admin — please use Worker Login.",
+    "dup_as_admin": "You are already registered as an admin ({{name}}). Use Admin Login instead.",
+    "dup_generic": "This face is already enrolled as {{name}}.",
+    "err_name": "Name is required",
+    "err_mobile": "Invalid mobile number",
+    "err_aadhar": "Invalid Aadhar number",
+    "err_generic": "Signup failed"
+  },
+  "admin_login": {
+    "title": "Admin Login",
+    "subtitle": "Enter your registered mobile and Aadhar",
+    "mobile_label": "Mobile Number",
+    "mobile_ph": "10-digit mobile",
+    "aadhar_label": "Aadhar Number",
+    "btn": "Login",
+    "err_mobile": "Invalid mobile number",
+    "err_aadhar": "Invalid Aadhar number",
+    "invalid": "Mobile or Aadhar does not match",
+    "not_found": "No admin found with this mobile",
+    "failed": "Login failed",
+    "no_account": "No account? Sign up as admin"
+  },
+  "admin_dash": {
+    "tab": "Dashboard",
+    "hello": "Hello",
+    "total_workers": "Workers",
+    "active": "Active",
+    "quick_actions": "Quick Actions",
+    "add_worker": "Add Worker",
+    "view_workers": "View Workers",
+    "attendance": "Attendance",
+    "settings": "Settings",
+    "system_status": "System Status",
+    "online": "Online & syncing",
+    "last_refresh": "Last refresh"
+  },
+  "workers_list": {
+    "tab": "Workers",
+    "title": "Workers",
+    "count_suffix": "registered",
+    "delete_title": "Deactivate Worker",
+    "delete_msg": "Deactivate {{name}}? They will no longer be able to log in.",
+    "delete_btn": "Deactivate",
+    "empty_title": "No workers yet",
+    "empty_sub": "Add your first worker to get started"
+  },
+  "add_worker": {
+    "title": "Add Worker",
+    "subtitle": "Enter worker details and capture their face",
+    "name_label": "Worker Name",
+    "name_ph": "e.g. Suresh Verma",
+    "aadhar_label": "Aadhar Number",
+    "aadhar_helper": "Stored hashed for privacy",
+    "next": "Continue → Capture Face",
+    "face_pending": "Capture face...",
+    "submitting": "Saving worker...",
+    "success": "Worker added!",
+    "face_cancelled": "Face capture cancelled — please try again",
+    "dup_as_worker": "A worker is already registered with this face ({{name}}).",
+    "dup_as_admin": "This face belongs to an admin ({{name}}). Cannot register as a worker.",
+    "dup_generic": "This face is already enrolled as {{name}}.",
+    "err_name": "Name is required",
+    "err_aadhar": "Invalid Aadhar number",
+    "err_generic": "Failed"
+  },
+  "settings": {
+    "tab": "Settings",
+    "title": "Settings",
+    "account": "Account",
+    "aaa_mode": "AAA Outdoor Mode",
+    "aaa_hint": "High contrast for sunlight + gloves",
+    "language": "Language",
+    "api": "Backend API",
+    "logout": "Logout",
+    "logout_title": "Logout?",
+    "logout_msg": "You will need to log in again."
+  },
+  "worker_login": {
+    "title": "Worker Login",
+    "subtitle": "Enter your name and Aadhar to punch in",
+    "name_label": "Name",
+    "name_ph": "Your registered name",
+    "aadhar_label": "Aadhar Number",
+    "btn": "Login & Continue",
+    "err_name": "Enter your full name",
+    "err_aadhar": "Invalid Aadhar number",
+    "invalid": "Name or Aadhar does not match. Contact your admin.",
+    "failed": "Login failed",
+    "hint": "Need help? Contact your supervisor (admin)."
+  },
+  "punch": {
+    "hello": "Hello",
+    "today_status": "Today's status",
+    "status_idle": "Not punched in",
+    "status_in": "Punched in at",
+    "status_done": "Day complete",
+    "total_hours": "Total",
+    "elapsed": "Elapsed",
+    "out_at": "Out at",
+    "punch_in": "PUNCH IN",
+    "punch_out": "PUNCH OUT",
+    "day_complete": "DAY COMPLETE",
+    "tap_to_verify": "Tap to verify face",
+    "view_calendar": "View attendance history",
+    "already_in": "Already punched in",
+    "not_in": "Punch in first before punching out",
+    "day_complete_title": "Day complete",
+    "day_complete_msg": "You have already punched out today. Come back tomorrow.",
+    "logout_title": "Logout?",
+    "logout_msg": "You will need to log in again."
+  },
+  "punch_capture": {
+    "title_in": "Punch In",
+    "title_out": "Punch Out",
+    "prompt_in": "Look at the camera to punch in",
+    "prompt_out": "Look at the camera to punch out",
+    "look": "Look at the camera",
+    "hold": "Hold still...",
+    "gps": "Capturing location...",
+    "saving": "Saving...",
+    "face_mismatch": "Face does not match your registered profile",
+    "timeout": "Could not detect your face. Please retry in better light.",
+    "no_face": "No face detected",
+    "storage_error": "Failed to save punch event",
+    "spoof": "Spoof attempt detected",
+    "success_in": "Punched in successfully",
+    "success_out": "Punched out successfully"
+  },
+  "punch_result": {
+    "success_in": "Punched In!",
+    "success_out": "Punched Out!",
+    "failed": "Verification Failed",
+    "gps_ok": "Location captured",
+    "gps_missing": "Location unavailable",
+    "synced_later": "Saved offline — will sync automatically",
+    "tap_to_return": "Tap to return",
+    "r_face": "Face did not match your enrolled profile",
+    "r_timeout": "Could not detect face. Try better lighting.",
+    "r_spoof": "Spoof attempt detected",
+    "r_generic": "Something went wrong"
+  },
+  "sync": {
+    "all_synced": "Synced",
+    "pending": "pending",
+    "pending_count": "{{count}} pending"
+  },
+  "calendar": {
+    "legend_full": "Full day",
+    "legend_partial": "Partial",
+    "legend_absent": "Absent"
+  },
+  "worker_cal": {
+    "title": "My Attendance",
+    "full_days": "Full days",
+    "total_hours": "Total hours",
+    "avg": "Avg/day",
+    "no_data": "No attendance recorded",
+    "in": "In",
+    "out": "Out",
+    "duration": "Worked"
+  },
+  "admin_cal": {
+    "tab": "Calendar",
+    "title": "Attendance",
+    "pick_worker": "Pick a worker to view attendance",
+    "empty": "No workers yet"
+  },
+  "admin_wcal": {
+    "days": "Days worked",
+    "hours": "Total hours",
+    "no_data": "No attendance recorded"
   }
 }

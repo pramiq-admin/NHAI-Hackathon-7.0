@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+# Explicit package list — auto-discovery confused on `app/`, `scripts/`,
+# `alembic/`, `tests/`, `ml/`, `notebooks/`. Only `app` is shipped as the
+# importable package.
+packages = ["app"]
+
+[project]
+name = "nhai-face-auth-backend"
+version = "0.1.0"
+description = "NHAI Face Authentication Backend"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi[standard]>=0.115",
+    "sqlalchemy[asyncio]>=2.0",
+    "asyncpg>=0.30",
+    "python-jose[cryptography]>=3.3",
+    "pydantic[email]>=2.0",
+    "pydantic-settings>=2.0",
+    "alembic>=1.14",
+    "structlog>=24.0",
+    "passlib[bcrypt]>=1.7",
+    "prometheus-fastapi-instrumentator>=7.0",
+    "httpx>=0.28",
+    "uvicorn>=0.34",
+    # Rate-limiting for auth endpoints (S11)
+    "slowapi>=0.1.9",
+    # Sync Postgres driver for Alembic. The app uses asyncpg at runtime;
+    # alembic migrations are sync-only and need psycopg2 (or psycopg3) to
+    # talk to PG. env.py rewrites the URL driver to psycopg2 at migration time.
+    "psycopg2-binary>=2.9",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.8",
+]

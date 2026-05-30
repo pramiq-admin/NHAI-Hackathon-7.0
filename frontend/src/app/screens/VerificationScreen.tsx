@@ -1,5 +1,5 @@
 import React, {useEffect, useState, useCallback} from 'react';
-import {StyleSheet, Text, View, TouchableOpacity} from 'react-native';
+import {StyleSheet, Text, View, TouchableOpacity, Linking} from 'react-native';
 import {
   Camera,
   useCameraDevice,
@@ -12,30 +12,32 @@ import {useFaceDetector} from 'react-native-vision-camera-face-detector';
 import {useTranslation} from 'react-i18next';
 import {useNavigation} from '@react-navigation/native';
 
-import {postProcessYuNet} from '../../ml/processors/faceDetect.worklet';
-import {extractEmbedding} from '../../ml/processors/faceEmbed.worklet';
+import type {FaceDetection} from '../../ml/processors/faceDetect.worklet';
+import {extractMLKitSignature} from '../../ml/processors/mlkitSignature.worklet';
 import {runAntiSpoof} from '../../ml/processors/antiSpoof.worklet';
-import {THRESHOLDS} from '../../ml/thresholds';
 import {useFaceAuth} from '../hooks/useFaceAuth';
 import {useLiveness} from '../hooks/useLiveness';
 import {useVoicePrompt} from '../components/VoicePrompt';
 import AuthResultBanner from '../components/AuthResultBanner';
 import LivenessChallengeOverlay from '../components/LivenessChallengeOverlay';
 import {useThemeContext} from '../theme/ThemeContext';
+import {enqueueEvent} from '../../sync/syncWorker';
+import {recordScore} from '../../ml/processors/adaptiveThreshold';
 import type {FaceData} from '../../ml/challenges/challengeEngine';
 
 type VerifyPhase = 'idle' | 'liveness' | 'verifying' | 'done';
-
-const YUNET_INPUT = 640;
-const CONFIDENCE_MIN = THRESHOLDS.DETECTION_CONFIDENCE;
 
 export default function VerificationScreen() {
   const {t} = useTranslation();
   const navigation = useNavigation();
   const {isAAA} = useThemeContext();
-  const {hasPermission} = useCameraPermission();
+  const {hasPermission, requestPermission} = useCameraPermission();
   const device = useCameraDevice('front');
   const {speak} = useVoicePrompt();
+
+  useEffect(() => {
+    if (!hasPermission) requestPermission();
+  }, [hasPermission, requestPermission]);
 
   const [verifyPhase, setVerifyPhase] = useState<VerifyPhase>('idle');
   const [spoofResult, setSpoofResult] = useState<{isReal: boolean; score: number} | null>(null);
@@ -49,15 +51,10 @@ export default function VerificationScreen() {
   const faceDetector = useFaceDetector({
     performanceMode: 'fast',
     classificationMode: 'all',
+    landmarkMode: 'all',
     minFaceSize: 0.2,
   });
 
-  const yunet = useTensorflowModel(
-    require('../../../assets/models/yunet_int8.tflite'),
-  );
-  const edgeface = useTensorflowModel(
-    require('../../../assets/models/edgeface_xs_int8.tflite'),
-  );
   const antiSpoofV2 = useTensorflowModel(
     require('../../../assets/models/minifasnet_v2.tflite'),
   );
@@ -65,8 +62,6 @@ export default function VerificationScreen() {
     require('../../../assets/models/minifasnet_v1se.tflite'),
   );
 
-  const yunetModel = yunet.state === 'loaded' ? yunet.model : undefined;
-  const edgefaceModel = edgeface.state === 'loaded' ? edgeface.model : undefined;
   const antiSpoofV2Model = antiSpoofV2.state === 'loaded' ? antiSpoofV2.model : undefined;
   const antiSpoofV1SEModel = antiSpoofV1SE.state === 'loaded' ? antiSpoofV1SE.model : undefined;
 
@@ -104,7 +99,6 @@ export default function VerificationScreen() {
   useEffect(() => {
     if (liveness.phase === 'passed' && verifyPhase === 'liveness') {
       speak(t('liveness.passed'), false);
-      // Anti-spoof will run on next frame in the frame processor
       setVerifyPhase('verifying');
       verifyPhaseShared.value = 'verifying';
     } else if (liveness.phase === 'failed' && verifyPhase === 'liveness') {
@@ -113,6 +107,12 @@ export default function VerificationScreen() {
       verifyPhaseShared.value = 'done';
     }
   }, [liveness.phase, verifyPhase, speak, t]);
+
+  useEffect(() => {
+    if (liveness.faceLost && verifyPhase === 'liveness') {
+      speak(t('liveness.face_lost'), false);
+    }
+  }, [liveness.faceLost, verifyPhase, speak, t]);
 
   const handleRetry = useCallback(() => {
     liveness.reset();
@@ -165,29 +165,25 @@ export default function VerificationScreen() {
           }
         }
 
-        // Run face recognition
-        if (!yunetModel) return;
+        // Face recognition via ML Kit landmarks → 512-d signature
         const start = performance.now();
         try {
-          const out = yunetModel.runSync([frame as any]);
-          if (out && out.length >= 4) {
-            const dets = postProcessYuNet(
-              out as unknown as ArrayBuffer[],
-              YUNET_INPUT,
-              YUNET_INPUT,
-              frame.width,
-              frame.height,
-            );
-            const latency = performance.now() - start;
-            if (dets.length > 0) {
-              let emb = null;
-              if (edgefaceModel && dets[0].confidence > CONFIDENCE_MIN) {
-                emb = extractEmbedding(edgefaceModel, frame);
-              }
-              onFrameResultJS(dets[0], emb, latency);
-            } else {
-              onFrameResultJS(null, null, latency);
-            }
+          const faces = faceDetector.detectFaces(frame);
+          const latency = performance.now() - start;
+          if (faces.length > 0) {
+            const f = faces[0];
+            const det: FaceDetection = {
+              x: f.bounds?.x ?? 0,
+              y: f.bounds?.y ?? 0,
+              width: f.bounds?.width ?? 0,
+              height: f.bounds?.height ?? 0,
+              confidence: 1.0,
+              landmarks: [],
+            };
+            const sig = extractMLKitSignature(f, frame.width, frame.height);
+            onFrameResultJS(det, sig, latency);
+          } else {
+            onFrameResultJS(null, null, latency);
           }
         } catch {}
       }
@@ -195,8 +191,6 @@ export default function VerificationScreen() {
     [
       verifyPhaseShared,
       spoofCheckedShared,
-      yunetModel,
-      edgefaceModel,
       antiSpoofV2Model,
       antiSpoofV1SEModel,
       faceDetector,
@@ -214,20 +208,51 @@ export default function VerificationScreen() {
       );
       setVerifyPhase('done');
       verifyPhaseShared.value = 'done';
-    }
-  }, [pipelineResult?.stage, pipelineResult?.match?.name, speak, t, verifyPhase]);
 
-  if (!device || !hasPermission) {
+      const match = pipelineResult.match;
+      if (match) {
+        enqueueEvent({
+          event_id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+          user_id: match.userId,
+          user_name: match.name,
+          device_id: 'device-01',
+          timestamp: new Date().toISOString(),
+          cosine_score: match.score,
+          liveness_passed: true,
+          pad_score: spoofResult?.score,
+          latency_ms: pipelineResult.embeddingLatencyMs,
+          bio_hash_verified: pipelineResult.bioHashVerified,
+          bio_hash_distance: pipelineResult.bioHashDistance,
+        });
+        recordScore(match.userId, match.score);
+      }
+    }
+  }, [pipelineResult?.stage, pipelineResult?.match?.name, speak, t, verifyPhase, spoofResult]);
+
+  if (!hasPermission) {
     return (
       <View style={styles.container}>
-        <Text style={styles.message}>{t('common.loading')}</Text>
+        <Text style={styles.message}>{t('common.camera_required')}</Text>
+        <TouchableOpacity
+          style={styles.permissionBtn}
+          onPress={() => requestPermission().then(granted => {
+            if (!granted) Linking.openSettings();
+          })}>
+          <Text style={styles.permissionBtnText}>{t('common.grant_permission')}</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (!device) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.message}>{t('common.no_camera')}</Text>
       </View>
     );
   }
 
   const modelsLoading =
-    yunet.state === 'loading' ||
-    edgeface.state === 'loading' ||
     antiSpoofV2.state === 'loading' ||
     antiSpoofV1SE.state === 'loading';
 
@@ -264,19 +289,23 @@ export default function VerificationScreen() {
       {verifyPhase === 'idle' && (
         <View style={styles.startOverlay}>
           {modelsLoading ? (
-            <Text style={[styles.instruction, isAAA && styles.instructionAAA]}>
-              {t('common.loading')}
-            </Text>
+            <View style={styles.instructionPill}>
+              <Text style={[styles.instruction, isAAA && styles.instructionAAA]}>
+                {t('common.loading')}
+              </Text>
+            </View>
           ) : (
             <>
-              <Text style={[styles.instruction, isAAA && styles.instructionAAA]}>
-                {t('verify.position_face')}
-              </Text>
+              <View style={styles.instructionPill}>
+                <Text style={[styles.instruction, isAAA && styles.instructionAAA]}>
+                  📍 {t('verify.position_face')}
+                </Text>
+              </View>
               <TouchableOpacity
                 style={[styles.startBtn, isAAA && styles.startBtnAAA]}
                 onPress={handleStartLiveness}>
                 <Text style={[styles.startBtnText, isAAA && styles.startBtnTextAAA]}>
-                  {t('liveness.start')}
+                  ▶  {t('liveness.start')}
                 </Text>
               </TouchableOpacity>
             </>
@@ -286,12 +315,21 @@ export default function VerificationScreen() {
 
       {/* Liveness phase — challenge overlay */}
       {verifyPhase === 'liveness' && (
-        <LivenessChallengeOverlay
-          phase={liveness.phase}
-          currentStep={liveness.currentStep}
-          stepIndex={liveness.stepIndex}
-          totalSteps={liveness.totalSteps}
-        />
+        <>
+          <LivenessChallengeOverlay
+            phase={liveness.phase}
+            currentStep={liveness.currentStep}
+            stepIndex={liveness.stepIndex}
+            totalSteps={liveness.totalSteps}
+          />
+          {liveness.faceLost && (
+            <View style={styles.faceLostBanner}>
+              <Text style={[styles.faceLostText, isAAA && styles.faceLostTextAAA]}>
+                {t('liveness.face_lost')}
+              </Text>
+            </View>
+          )}
+        </>
       )}
 
       {/* Spoof detected banner */}
@@ -333,9 +371,13 @@ export default function VerificationScreen() {
         <Text style={styles.debugText}>
           {verifyPhase.toUpperCase()}
           {fps > 0 ? ` | ${fps} FPS` : ''}
-          {detection ? ` | ${detection.confidence.toFixed(2)}` : ''}
+          {pipelineResult?.match
+            ? ` | ${pipelineResult.match.name} (${pipelineResult.match.score.toFixed(2)})`
+            : ` | DB: ${templateCount}`}
           {spoofResult ? ` | PAD: ${spoofResult.score.toFixed(2)}` : ''}
-          {` | DB: ${templateCount}`}
+          {pipelineResult?.bioHashDistance !== undefined
+            ? ` | BH: ${pipelineResult.bioHashDistance.toFixed(3)}`
+            : ''}
         </Text>
       </View>
     </View>
@@ -343,167 +385,158 @@ export default function VerificationScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#000',
-  },
+  container: {flex: 1, backgroundColor: '#000'},
   message: {
-    color: '#fff',
+    color: '#F8FAFC',
     fontSize: 16,
     textAlign: 'center',
     marginTop: 100,
   },
+  permissionBtn: {
+    marginTop: 24,
+    alignSelf: 'center',
+    backgroundColor: '#F59E0B',
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  permissionBtnText: {color: '#fff', fontSize: 16, fontWeight: '700'},
   guideOverlay: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    top: 0, left: 0, right: 0, bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
   },
   faceGuide: {
-    width: 260,
-    height: 340,
-    borderRadius: 130,
+    width: 270,
+    height: 350,
+    borderRadius: 135,
     borderWidth: 3,
-    borderColor: 'rgba(255,255,255,0.4)',
+    borderColor: 'rgba(255,255,255,0.55)',
     borderStyle: 'dashed',
   },
-  faceGuideAAA: {
-    borderWidth: 4,
-    borderColor: '#ffdd00',
-  },
-  faceGuideMatch: {
-    borderColor: '#00cc66',
-    borderStyle: 'solid',
-  },
-  faceGuideReject: {
-    borderColor: '#ff4444',
-    borderStyle: 'solid',
-  },
+  faceGuideAAA: {borderWidth: 5, borderColor: '#FFD700'},
+  faceGuideMatch: {borderColor: '#10B981', borderStyle: 'solid', borderWidth: 5},
+  faceGuideReject: {borderColor: '#EF4444', borderStyle: 'solid', borderWidth: 5},
   startOverlay: {
     position: 'absolute',
-    bottom: 160,
-    left: 20,
-    right: 20,
+    bottom: 140,
+    left: 20, right: 20,
     alignItems: 'center',
+  },
+  instructionPill: {
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 999,
+    marginBottom: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.4)',
   },
   instruction: {
-    color: '#fff',
-    fontSize: 16,
-    marginBottom: 20,
-    opacity: 0.7,
+    color: '#F8FAFC',
+    fontSize: 15,
     textAlign: 'center',
+    fontWeight: '500',
   },
-  instructionAAA: {
-    fontSize: 22,
-    opacity: 1,
-    color: '#ffdd00',
-  },
+  instructionAAA: {fontSize: 22, color: '#FFD700', fontWeight: '700'},
   startBtn: {
-    backgroundColor: '#0096ff',
-    paddingHorizontal: 40,
-    paddingVertical: 16,
-    borderRadius: 14,
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 48,
+    paddingVertical: 18,
+    borderRadius: 999,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    shadowColor: '#3B82F6',
+    shadowOffset: {width: 0, height: 6},
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    elevation: 10,
   },
   startBtnAAA: {
-    backgroundColor: '#ffdd00',
-    paddingVertical: 20,
-    borderRadius: 18,
+    backgroundColor: '#FFD700',
+    paddingVertical: 22,
   },
-  startBtnText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '700',
+  startBtnText: {color: '#fff', fontSize: 18, fontWeight: '800', letterSpacing: 0.5},
+  startBtnTextAAA: {color: '#000', fontSize: 24},
+  faceLostBanner: {
+    position: 'absolute',
+    top: 110,
+    left: 20, right: 20,
+    backgroundColor: '#F59E0B',
+    borderRadius: 14,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    justifyContent: 'center',
   },
-  startBtnTextAAA: {
-    color: '#000',
-    fontSize: 24,
-    fontWeight: '800',
-  },
+  faceLostText: {color: '#fff', fontSize: 15, fontWeight: '700', textAlign: 'center'},
+  faceLostTextAAA: {fontSize: 20, color: '#000'},
   spoofBanner: {
     position: 'absolute',
-    top: 120,
-    left: 20,
-    right: 20,
-    backgroundColor: 'rgba(255,68,68,0.9)',
-    borderRadius: 12,
-    padding: 16,
+    top: 110,
+    left: 20, right: 20,
+    backgroundColor: '#EF4444',
+    borderRadius: 16,
+    padding: 18,
     alignItems: 'center',
+    shadowColor: '#EF4444',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 6,
   },
-  spoofText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  spoofTextAAA: {
-    fontSize: 24,
-    color: '#ffdd00',
-  },
+  spoofText: {color: '#fff', fontSize: 17, fontWeight: '800', textAlign: 'center'},
+  spoofTextAAA: {fontSize: 24, color: '#FFD700'},
   bottomBar: {
     position: 'absolute',
-    bottom: 40,
-    left: 20,
-    right: 20,
-    gap: 12,
+    bottom: 30,
+    left: 20, right: 20,
+    gap: 10,
   },
   actionBtn: {
-    backgroundColor: '#0096ff',
-    paddingVertical: 14,
-    borderRadius: 12,
+    backgroundColor: '#3B82F6',
+    paddingVertical: 16,
+    borderRadius: 14,
     alignItems: 'center',
   },
-  actionBtnAAA: {
-    backgroundColor: '#ffdd00',
-    paddingVertical: 18,
-    borderRadius: 16,
-  },
-  actionBtnText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  actionBtnTextAAA: {
-    color: '#000',
-    fontSize: 22,
-    fontWeight: '700',
-  },
+  actionBtnAAA: {backgroundColor: '#FFD700', paddingVertical: 20, borderRadius: 18},
+  actionBtnText: {color: '#fff', fontSize: 17, fontWeight: '700'},
+  actionBtnTextAAA: {color: '#000', fontSize: 22, fontWeight: '800'},
   backBtn: {
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(15, 23, 42, 0.7)',
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: 14,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
   },
   backBtnAAA: {
-    backgroundColor: 'rgba(255,221,0,0.3)',
+    backgroundColor: 'rgba(255, 215, 0, 0.15)',
     paddingVertical: 18,
-    borderRadius: 16,
+    borderRadius: 18,
+    borderColor: '#FFD700',
   },
-  backBtnText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  backBtnTextAAA: {
-    color: '#ffdd00',
-    fontSize: 22,
-    fontWeight: '700',
-  },
+  backBtnText: {color: '#F8FAFC', fontSize: 15, fontWeight: '600'},
+  backBtnTextAAA: {color: '#FFD700', fontSize: 20, fontWeight: '700'},
   debugBar: {
     position: 'absolute',
-    top: 50,
-    left: 0,
-    right: 0,
+    top: 48,
+    left: 0, right: 0,
     alignItems: 'center',
   },
   debugText: {
-    color: '#0f0',
+    color: '#F8FAFC',
     fontSize: 11,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
+    fontWeight: '600',
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.5)',
+    letterSpacing: 0.3,
   },
 });

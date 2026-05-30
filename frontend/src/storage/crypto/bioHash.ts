@@ -26,7 +26,15 @@ function seededRng(seed: string): () => number {
   };
 }
 
+// Projection matrices are deterministic per salt; cache last few to avoid
+// recomputing the 512x512 Gram-Schmidt on every verification frame.
+const MATRIX_CACHE_SIZE = 8;
+const matrixCache = new Map<string, number[][]>();
+
 function generateProjectionMatrix(salt: string): number[][] {
+  const cached = matrixCache.get(salt);
+  if (cached) return cached;
+
   const rng = seededRng(salt);
   const matrix: number[][] = [];
 
@@ -64,6 +72,13 @@ function generateProjectionMatrix(salt: string): number[][] {
 
     matrix.push(row);
   }
+
+  // Evict oldest entry if cache full (Map iterates in insertion order)
+  if (matrixCache.size >= MATRIX_CACHE_SIZE) {
+    const oldest = matrixCache.keys().next().value;
+    if (oldest !== undefined) matrixCache.delete(oldest);
+  }
+  matrixCache.set(salt, matrix);
 
   return matrix;
 }
