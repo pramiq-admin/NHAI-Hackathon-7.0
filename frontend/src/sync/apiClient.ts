@@ -1,7 +1,8 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {API_HOST} from './apiConfig';
 
-const API_BASE = 'http://10.0.2.2:8000/api/v1';
+const API_BASE = `${API_HOST}/api/v1`;
 const SHARED_SECRET = 'nhai-hackathon-shared-secret';
 const TOKEN_KEY = '@nhai_jwt';
 

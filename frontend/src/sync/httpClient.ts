@@ -1,8 +1,9 @@
 // Lightweight fetch-based client for the new role-based auth endpoints
 // (kept separate from the legacy axios-based apiClient.ts which uses device JWT)
 import {useSession} from '../app/auth/sessionStore';
+import {API_HOST} from './apiConfig';
 
-const DEFAULT_BASE_URL = 'http://10.0.2.2:8000'; // Android emulator → host loopback
+const DEFAULT_BASE_URL = API_HOST; // resolved per-platform / LAN IP — see apiConfig.ts
 
 let baseUrl = DEFAULT_BASE_URL;
 

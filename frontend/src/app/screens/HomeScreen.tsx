@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useState, useEffect, useCallback} from 'react';
 import {
   View,
   Text,
@@ -7,12 +7,16 @@ import {
   StatusBar,
   ScrollView,
   SafeAreaView,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import {useTranslation} from 'react-i18next';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import type {RootStackParamList} from '../navigation/RootStack';
 import {useThemeContext} from '../theme/ThemeContext';
 import {COLORS} from '../theme/aaaTheme';
+import {syncPendingEvents, getQueueSize} from '../../sync/syncWorker';
+import {triggerPunchSync, getCurrentUnsyncedCount} from '../../sync/punchSyncWorker';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Home'>;
@@ -22,6 +26,45 @@ export default function HomeScreen({navigation}: Props) {
   const {isAAA} = useThemeContext();
   const {t} = useTranslation();
   const c = isAAA ? COLORS.aaa : COLORS.normal;
+
+  const [syncing, setSyncing] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+
+  const refreshPendingCount = useCallback(async () => {
+    const legacy = await getQueueSize();
+    const punch = getCurrentUnsyncedCount();
+    setPendingCount(legacy + punch);
+  }, []);
+
+  useEffect(() => {
+    refreshPendingCount();
+    const interval = setInterval(refreshPendingCount, 5000);
+    return () => clearInterval(interval);
+  }, [refreshPendingCount]);
+
+  const handleSync = useCallback(async () => {
+    setSyncing(true);
+    try {
+      const [legacyResult, punchResult] = await Promise.all([
+        syncPendingEvents(),
+        triggerPunchSync(),
+      ]);
+      const totalSynced = legacyResult.synced + punchResult.synced;
+      const anyFailed = legacyResult.failed || punchResult.networkError;
+      await refreshPendingCount();
+      if (anyFailed) {
+        Alert.alert(t('sync.title'), t('sync.partial', {count: totalSynced}));
+      } else if (totalSynced > 0) {
+        Alert.alert(t('sync.title'), t('sync.success', {count: totalSynced}));
+      } else {
+        Alert.alert(t('sync.title'), t('sync.empty'));
+      }
+    } catch {
+      Alert.alert(t('sync.title'), t('sync.error'));
+    } finally {
+      setSyncing(false);
+    }
+  }, [refreshPendingCount, t]);
 
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: c.bg}]}>
@@ -101,6 +144,43 @@ export default function HomeScreen({navigation}: Props) {
             </Text>
           </View>
           <Text style={[styles.cardArrow, {color: c.accent}]}>→</Text>
+        </TouchableOpacity>
+
+        {/* Sync button */}
+        <TouchableOpacity
+          activeOpacity={0.8}
+          disabled={syncing}
+          style={[
+            styles.syncCard,
+            {
+              backgroundColor: pendingCount > 0 ? c.accent : c.surface,
+              borderColor: c.accent,
+              borderWidth: pendingCount > 0 ? 0 : 1.5,
+            },
+          ]}
+          onPress={handleSync}>
+          <View style={styles.cardIconWrap}>
+            {syncing ? (
+              <ActivityIndicator color={pendingCount > 0 ? '#000' : c.accent} size="small" />
+            ) : (
+              <Text style={styles.cardIcon}>🔄</Text>
+            )}
+          </View>
+          <View style={styles.cardContent}>
+            <Text style={[styles.cardTitle, {color: pendingCount > 0 ? '#000' : c.text}]}>
+              {syncing ? t('sync.syncing') : t('sync.button')}
+            </Text>
+            <Text style={[styles.cardSubtitle, {color: pendingCount > 0 ? 'rgba(0,0,0,0.7)' : c.textSecondary}]}>
+              {pendingCount > 0
+                ? t('sync.pending', {count: pendingCount})
+                : t('sync.up_to_date')}
+            </Text>
+          </View>
+          {pendingCount > 0 && (
+            <View style={styles.syncBadge}>
+              <Text style={styles.syncBadgeText}>{pendingCount}</Text>
+            </View>
+          )}
         </TouchableOpacity>
 
         {/* Tertiary — Admin */}
@@ -236,6 +316,28 @@ const styles = StyleSheet.create({
   cardArrow: {
     fontSize: 24,
     fontWeight: '300',
+  },
+  syncCard: {
+    borderRadius: 18,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+    marginTop: 6,
+  },
+  syncBadge: {
+    backgroundColor: '#d32f2f',
+    borderRadius: 14,
+    minWidth: 28,
+    height: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+  },
+  syncBadgeText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
   },
   adminPill: {
     flexDirection: 'row',
