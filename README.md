@@ -1,6 +1,6 @@
 # NHAI Face Authentication System
 
-> **Hackathon 7.0 Submission** | Participant: Sahil Chandel (Solo) | Theme: AI-based Face Authentication for Highway Workers
+> **Hackathon 7.0 Submission** | Participant: PramIQ Solutions | Theme: AI-based Face Authentication for Highway Workers
 
 On-device AI face recognition for NHAI highway workforce attendance — offline-first, privacy-preserving, built for Indian demographics. Works on Rs 12,000 phones with <300ms latency.
 
@@ -18,7 +18,7 @@ https://github.com/user-attachments/assets/e8175d6d-4098-4a74-8d38-b3afbd987a2b
 
 ---
 
-> ⚠️ **PROPRIETARY — Copyright © 2026 Sahil Chandel. All Rights Reserved.**
+> ⚠️ **PROPRIETARY — Copyright © 2026 PramIQ Solutions. All Rights Reserved.**
 >
 > This repository is **source-available for NHAI Hackathon 7.0 evaluation only — it is NOT open-source.**
 > **Unauthorized cloning, copying, forking, use, modification, or distribution is strictly prohibited** and
@@ -187,7 +187,7 @@ Backend: 13 tests passed
 
 ## License
 
-**Proprietary — Copyright © 2026 Sahil Chandel. All Rights Reserved.**
+**Proprietary — Copyright © 2026 PramIQ Solutions. All Rights Reserved.**
 
 This project is **source-available for NHAI Hackathon 7.0 evaluation only** and is **NOT** released under any
 open-source license (MIT/Apache/etc.). No permission is granted to copy, clone, fork, use, modify, or distribute
