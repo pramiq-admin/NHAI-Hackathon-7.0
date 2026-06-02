@@ -12,7 +12,7 @@ https://github.com/user-attachments/assets/683d9cca-107a-47d5-9b51-bf5f6ba8fa67
 
 **📱 App Demo** — the working app in action
 
-https://github.com/user-attachments/assets/e8175d6d-4098-4a74-8d38-b3afbd987a2b
+https://github.com/pramiq-admin/NHAI-Hackathon-7.0/raw/main/NFA_Demo_video.mp4
 
 📊 **Slides:** [NHAI Hackathon 7.0 Pitch Deck (PDF)](./NHAI%20Hackathon%207.0%20Pitch%20Deck.pdf)
 
