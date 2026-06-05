@@ -12,6 +12,10 @@ detection, recognition, liveness and storage all run on-device.
 
 https://github.com/user-attachments/assets/6398abb5-5273-45a1-ac6d-732ec97985db
 
+> 🧪 **Want to try the app?** For evaluation we've pre-loaded a set of **dummy worker records** in the Datalake 3.0
+> registry. Pick any entry from the **[Demo Users Cheat Sheet](./DEMO_DUMMY_USERS.md)**, enter those four details on
+> the *Login as Worker* screen, complete the one-time face registration, and you're in — punch in / out fully offline.
+
 > 📄 **Full technical documentation:** [PDF](./NHAI_NFA_Technical_Documentation.pdf) · [HTML](./NHAI_NFA_Technical_Documentation.html) — architecture, model footprint, integration steps and benchmarks. This README mirrors that document.
 
 ---
