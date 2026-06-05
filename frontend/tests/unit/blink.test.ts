@@ -1,4 +1,9 @@
 import {initBlinkState, updateBlinkState} from '../../src/ml/challenges/blink';
+import {THRESHOLDS} from '../../src/ml/thresholds';
+
+// Past the per-step timeout — derived from the threshold so the test can't go
+// stale if CHALLENGE_STEP_TIMEOUT_MS is retuned.
+const TIMED_OUT = THRESHOLDS.CHALLENGE_STEP_TIMEOUT_MS + 1000;
 
 describe('blink state machine', () => {
   it('starts in waiting_close', () => {
@@ -23,12 +28,12 @@ describe('blink state machine', () => {
   });
 
   it('fails on timeout', () => {
-    const state = updateBlinkState('waiting_close', 0.9, 0.9, 4000);
+    const state = updateBlinkState('waiting_close', 0.9, 0.9, TIMED_OUT);
     expect(state).toBe('failed');
   });
 
   it('fails mid-challenge on timeout', () => {
-    const state = updateBlinkState('waiting_open', 0.1, 0.1, 4000);
+    const state = updateBlinkState('waiting_open', 0.1, 0.1, TIMED_OUT);
     expect(state).toBe('failed');
   });
 

@@ -5,6 +5,11 @@ import {
   currentChallenge,
   type FaceData,
 } from '../../src/ml/challenges/challengeEngine';
+import {THRESHOLDS} from '../../src/ml/thresholds';
+
+// Past the per-step timeout — derived from the threshold so the test can't go
+// stale if CHALLENGE_STEP_TIMEOUT_MS is retuned.
+const TIMED_OUT_MS = THRESHOLDS.CHALLENGE_STEP_TIMEOUT_MS + 1000;
 
 describe('generateSequence', () => {
   it('returns exactly 3 challenges', () => {
@@ -93,7 +98,7 @@ describe('updateChallenge', () => {
     // Simulate timeout with no progress
     const timedOut = {
       ...state,
-      challengeStartMs: Date.now() - 4000,
+      challengeStartMs: Date.now() - TIMED_OUT_MS,
     };
     let next = updateChallenge(timedOut, openFace, 16);
     // First timeout → retry (retried = true)
@@ -103,7 +108,7 @@ describe('updateChallenge', () => {
     // Second timeout → failed
     const timedOut2 = {
       ...next,
-      challengeStartMs: Date.now() - 4000,
+      challengeStartMs: Date.now() - TIMED_OUT_MS,
     };
     next = updateChallenge(timedOut2, openFace, 16);
     expect(next.status).toBe('failed');
