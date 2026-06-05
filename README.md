@@ -4,11 +4,7 @@
 
 On-device AI face recognition for NHAI highway workforce attendance — offline-first, privacy-preserving, built for Indian demographics. Works on Rs 12,000 phones with <300ms latency.
 
-## 🎥 Demo Videos
 
-**📽️ Pitch Deck** — problem, solution & impact (2:17)
-
-https://github.com/user-attachments/assets/683d9cca-107a-47d5-9b51-bf5f6ba8fa67
 
 **📱 App Demo** — the working app in action
 
